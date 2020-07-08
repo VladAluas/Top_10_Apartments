@@ -1,0 +1,161 @@
+---
+title: "Top 10 Apartments"
+output: html_document
+css: article.css
+---
+
+<div class = "date">
+**`r format(Sys.time(), '%d %b %Y')`**
+</div>
+
+<div class = "tags">
+
+</div>
+
+
+<div class = "time">
+
+</div>
+
+
+```{r setup_general, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, comment = "#>", collapse = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r setup_libraries, include=FALSE}
+library(tidyverse)
+library(vroom)
+library(rvest)
+library(kableExtra)
+library(doBy)
+library(scales)
+```
+
+
+
+# Hey there Miha!
+
+<div class="paragraph">
+
+I love you and since we are going to spend the rest of our live together, we will need to find the awesomest apartment on the market. In Order to do this I have created this document that will allow us to do just that. We can see the top something places on the market, we can decide on the exact numbers later. 
+
+</div>
+
+# Rules for filtering data
+
+<div class="paragraph">
+
+Here is the list of rules we have established in creating the top:
+
+  - The built area is larger than 60 m$^2$
+  - The building is constructed after 2010
+  - The price is below €100.000
+  - The apartment is located in Cluj-Napoca and not in the metropolitan area
+  
+  - Once we have this list we will use the price / m$^2$ to decide the top ten
+  
+</div>
+
+<div class="paragraph">
+
+All well and good? Let's see them. Drum roll please!!!
+
+</div>
+
+# Ta-Da!!!
+
+```{r data_ingestion, warning=FALSE, results="hide"}
+last_week <- seq.Date(from = Sys.Date() - 7, to = Sys.Date(), by = 1) %>% 
+  as_tibble() %>% 
+  mutate(Days = weekdays(value)) %>%
+  filter(Days == "Tuesday") %>%
+  select(value)
+
+last_tuesday <- last_week$value
+
+df <- read_csv(paste(str_replace(getwd(), "Top_10_Apartments", "Housing_Market"), "_Datasets/Data_Imobiliare_Apartamente_", last_tuesday, ".csv", sep = ""))
+
+rm(last_tuesday, last_week)
+```
+
+```{r data_cleaning, warning=FALSE}
+
+# First of we need to clean the data and make sure we have what we need
+
+# We will start with Usable area
+# We will simply add it if it's missing from Built area
+
+df <- df %>% mutate(`Usable Area` = ifelse(is.na(`Usable Area`), `Built Area`, `Usable Area`))
+
+# Next is the year of construction, not much to do there, neither to the next variable, parking place
+
+# Now we, ca decide how many floor below the top floor the apartment is. Let's get the building height and see where the apartment is located
+
+df <- df %>% mutate(`Floor Position` = as.numeric(str_extract(`Height Regiment`, "[0-9]+")) - Floor)
+
+# We also need the price / sqm
+
+df <- df %>% 
+  mutate(`Price / sqm` = `Total Price` / `Usable Area`)
+```
+
+
+```{r filters, warning=FALSE, results="hide"}
+df_final <- df %>%
+  filter(`Usable Area` > 60, 
+         `Construction Year` > 2010, 
+         `Total Price` < 100000,
+         !str_detect(Website, "baciu"),
+         !str_detect(Website, "apahida"),
+         !str_detect(Website, "floresti"),
+         !str_detect(Website, "becas"),
+         !str_detect(Website, "exterior"),
+         !str_detect(Website, "sopor"),
+         !str_detect(Website, "sannicoara")) %>%
+  arrange(`Price / sqm`) %>%
+  mutate(Index = row_number())
+```
+
+## Top 10
+
+```{r top_10_list, warning=FALSE}
+
+df_final %>%
+  mutate(`Title` = paste("[", Title, "](", Website, ")"),
+         `Total Price` = dollar(`Total Price`, prefix = "€", big.mark = ","),
+         `Price / sqm` = dollar(`Price / sqm`, prefix = "€", big.mark = ",")) %>%
+  select(Index, Title, ID, Compartments, Floor, Bathrooms, `Usable Area`, `Construction Year`, `Total Price`, `Price / sqm`) %>%
+  filter(Index < 11) %>%
+  kable(format = "html", caption = "Top 10 Apartments") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), fixed_thead = T) %>%
+  scroll_box(height = "500px")
+  
+```
+
+## Full list
+  
+```{r full_list, warning=FALSE}
+df_final %>%
+  mutate(Title = paste("[", Title, "](", Website, ")"),
+         `Total Price` = dollar(`Total Price`, prefix = "€", big.mark = ","),
+         `Price / sqm` = dollar(`Price / sqm`, prefix = "€", big.mark = ",")) %>%
+  select(Index, Title, ID, Compartments, Floor, Bathrooms, `Usable Area`, `Construction Year`, `Total Price`, `Price / sqm`) %>%
+  kable(format = "html", caption = "All apartments that meet the criteria") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), fixed_thead = T) %>%
+  scroll_box(height = "800px")
+  
+```
+
+
+<div class="paragraph">
+
+I tried eliminating apartments that are not from **Cluj** however there some still might have slipped trough.
+
+Just click the link and it should take you to the apartment.
+
+**I LOVE YOU**
+
+</div>
+  
+  
+  
